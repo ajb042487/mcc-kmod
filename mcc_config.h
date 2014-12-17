@@ -24,12 +24,14 @@
 /* base address of shared memory */
 #define MCC_BASE_ADDRESS               (BSP_SHARED_RAM_START)
 
-/* size and number of receive buffers */
+/* size (in bytes) and number of receive buffers */
 #define MCC_ATTR_NUM_RECEIVE_BUFFERS   (10)
-#define MCC_ATTR_BUFFER_SIZE_IN_KB     (1)
+#define MCC_ATTR_BUFFER_SIZE_IN_BYTES  (1024)
 
-/* maximum number of receive endpoints */
+/* maximum number of receive endpoints (application specific setting),
+ * do not assign it to a value greater than 255 ! */
 #define MCC_ATTR_MAX_RECEIVE_ENDPOINTS (5)
+
 
 /* size of the signal queue */
 #define MCC_MAX_OUTSTANDING_SIGNALS    (10)
@@ -44,6 +46,10 @@
 #define MCC_OTHER_CORES			{1}
 
 /* semaphore number */
-#define MCC_SEMAPHORE_NUMBER           (1)
+#define MCC_SHMEM_SEMAPHORE_NUMBER      (1)
+#define MCC_PRINTF_SEMAPHORE_NUMBER     (2)
+#define MCC_I2C_SEMAPHORE_NUMBER        (3)
+#define MCC_RESERVED1_SEMAPHORE_NUMBER  (4)
+#define MCC_RESERVED2_SEMAPHORE_NUMBER  (5)
 
 #endif /* __MCC_CONFIG__ */

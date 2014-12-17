@@ -125,7 +125,7 @@ int mcc_initialize_shared_mem(void)
 	unsigned char *bkdata;
 
 	// critical region for shared memory begins
-	if(mcc_sema4_grab(MCC_SEMAPHORE_NUMBER))
+	if(mcc_sema4_grab(MCC_SHMEM_SEMAPHORE_NUMBER))
 	{
 		mcc_deinitialize_shared_mem();
 		return -EBUSY;
@@ -168,7 +168,7 @@ int mcc_initialize_shared_mem(void)
 		printk(KERN_DEBUG "at entry, bookeeping_data was initialized\n");
 
 	// critical region for shared memory ends
-	mcc_sema4_release(MCC_SEMAPHORE_NUMBER);
+	mcc_sema4_release(MCC_SHMEM_SEMAPHORE_NUMBER);
 
 	return return_value;
 }

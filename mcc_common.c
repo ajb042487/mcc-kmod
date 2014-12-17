@@ -74,7 +74,7 @@ int mcc_remove_endpoint(MCC_ENDPOINT endpoint)
 	int i=0;
 	for(i = 0; i < MCC_ATTR_MAX_RECEIVE_ENDPOINTS; i++) {
 
-		if(ENDPOINTS_EQUAL(bookeeping_data->endpoint_table[i].endpoint, endpoint)) {
+		if(MCC_ENDPOINTS_EQUAL(bookeeping_data->endpoint_table[i].endpoint, endpoint)) {
 			/* clear the queue */
 #if (MCC_OS_USED == MCC_LINUX)
 			MCC_RECEIVE_BUFFER * buffer = mcc_dequeue_buffer(&bookeeping_data->endpoint_table[i].list);
@@ -170,7 +170,7 @@ MCC_RECEIVE_LIST * mcc_get_endpoint_list(MCC_ENDPOINT endpoint)
 	int i=0;
 	for(i = 0; i<MCC_ATTR_MAX_RECEIVE_ENDPOINTS; i++) {
 
-		if(ENDPOINTS_EQUAL(bookeeping_data->endpoint_table[i].endpoint, endpoint))
+		if(MCC_ENDPOINTS_EQUAL(bookeeping_data->endpoint_table[i].endpoint, endpoint))
 #if (MCC_OS_USED == MCC_LINUX)
 			return (MCC_RECEIVE_LIST *)&bookeeping_data->endpoint_table[i].list;
 #elif (MCC_OS_USED == MCC_MQX)

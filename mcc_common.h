@@ -55,7 +55,7 @@ __packed
 struct mcc_receive_buffer {
 	struct mcc_receive_buffer *next;
 	int data_len;
-	char data [MCC_ATTR_BUFFER_SIZE_IN_KB * 1024];
+	char data [MCC_ATTR_BUFFER_SIZE_IN_BYTES];
 #if defined(__IAR_SYSTEMS_ICC__)
 };
 #else
@@ -166,6 +166,7 @@ extern MCC_BOOKEEPING_STRUCT * bookeeping_data;
  * Common Macros
  */
 #define MCC_RESERVED_PORT_NUMBER  (0)
+#define MCC_MAX_RECEIVE_ENDPOINTS_COUNT (255)
 
 /*
  * Errors
@@ -178,6 +179,8 @@ extern MCC_BOOKEEPING_STRUCT * bookeeping_data;
 #define MCC_ERR_SEMAPHORE   (5) /* semaphore handling error */
 #define MCC_ERR_DEV         (6) /* Device Open Error*/
 #define MCC_ERR_INT         (7) /* Interrupt Error*/
+#define MCC_ERR_SQ_FULL     (8) /* Signal queue is full */
+#define MCC_ERR_SQ_EMPTY    (9) /* Signal queue is empty */
 
 /*
  * OS Selection
@@ -195,7 +198,12 @@ int mcc_dequeue_signal(MCC_CORE core, MCC_SIGNAL *signal);
 
 #define MCC_SIGNAL_QUEUE_FULL(core)  (((bookeeping_data->signal_queue_tail[core] + 1) % MCC_MAX_OUTSTANDING_SIGNALS) == bookeeping_data->signal_queue_head[core])
 #define MCC_SIGNAL_QUEUE_EMPTY(core) (bookeeping_data->signal_queue_head[core] == bookeeping_data->signal_queue_tail[core])
-#define ENDPOINTS_EQUAL(e1, e2)      ((e1.core == e2.core) && (e1.node == e2.node) && (e1.port == e2.port))
+#define MCC_ENDPOINTS_EQUAL(e1, e2)      ((e1.core == e2.core) && (e1.node == e2.node) && (e1.port == e2.port))
+
+#if (MCC_ATTR_MAX_RECEIVE_ENDPOINTS > MCC_MAX_RECEIVE_ENDPOINTS_COUNT)
+#error User-defined maximum number of endpoints can not exceed the value of MCC_MAX_RECEIVE_ENDPOINTS_COUNT
+#endif
+
 
 #endif /* __MCC_COMMON__ */
 
