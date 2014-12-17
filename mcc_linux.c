@@ -50,7 +50,7 @@
 
 typedef enum write_mode_enum {MODE_IMAGE_LOAD, MODE_MCC} WRITE_MODE;
 
-#define MAX_LOAD_SIZE (128*1024)
+#define MAX_LOAD_SIZE (256*1024)
 
 struct mcc_private_data
 {
