@@ -57,6 +57,7 @@ typedef unsigned int MCC_READ_MODE;
 #define MCC_GET_QUEUE_INFO						_IOR('M', 11, struct mcc_queue_info_struct)
 #define MCC_GET_NODE							_IOR('M', 12, MCC_NODE)
 #define MCC_SET_NODE							_IOW('M', 13, MCC_NODE)
+#define MCC_CHECK_ENDPOINT_EXISTS                                       _IOR('M', 14, MCC_ENDPOINT)
 
 // for interrupts
 #define MAX_MVF_CPU_TO_CPU_INTERRUPTS (4)

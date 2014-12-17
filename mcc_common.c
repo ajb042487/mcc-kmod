@@ -58,7 +58,9 @@ int mcc_register_endpoint(MCC_ENDPOINT endpoint)
 			return MCC_SUCCESS;
 		}
 	}
-	return MCC_ERR_ENDPOINT;
+
+	/* maximum number of endpoints were already allocated, return error */
+	return MCC_ERR_NOMEM;
 }
 
 /*!
