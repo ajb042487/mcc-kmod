@@ -22,6 +22,8 @@
 #include <linux/delay.h>
 #include <linux/kernel.h>
 #include <linux/semaphore.h>
+#include <linux/mvf_sema4.h>
+#include <linux/interrupt.h>
 
 // common to MQX and Linux
 // TODO the order of these should not matter
@@ -33,55 +35,89 @@
 #include "mcc_shm_linux.h"
 #include "mcc_sema4_linux.h"
 
+/*
+ * This modules combines protection between cores using
+ * mvf_sema4 routines with protection between multiple
+ * Linux processes using kernel semaphores (not mutex
+ * because they need to be tested under interrupt).
+ *
+ * Since MCC requires all of shared memory to be protected
+ * because of caching limitations on the M4 core
+ * the calling routines do not provide a gate number.
+ *
+ * No explicit init call is used. It is checked / done 
+ * at grab time.
+*/
+
+#define TIME_PROTECT_US 10000000
+
 // local mutex
 DEFINE_SEMAPHORE(linux_mutex);
 
-int mcc_sema4_grab(unsigned char gate_num)
-{
-	unsigned char gate_val;
-	int timeout_ms;
+// platform semaphore handle
+static MVF_SEMA4* sema4 = NULL;
 
-	if((gate_num < 0) || (gate_num >= MAX_SEMA4_GATES))
-		return -EINVAL;
+int mcc_sema4_grab()
+{
+	int i;
+
+	// inited yet?
+	if(!sema4) {
+		int ret = mvf_sema4_assign(MVF_SHMEM_SEMAPHORE_NUMBER, &sema4);
+		if(ret)
+			return ret;
+	}
 
 	// only 1 linux process at a time
 	if(down_killable(&linux_mutex) == EINTR)
 		return -EINTR;
 
-	gate_val = MCC_CORE_NUMBER + 1;
-	SEMA4_GATEn_WRITE(gate_val, gate_num);
+	// no M4 interrupts while we're working
+	for(i = 0; i<MAX_MVF_CPU_TO_CPU_INTERRUPTS; i++)
+		disable_irq(MVF_INT_CPU_INT0 + i);
 
-	/*
-	The expectation is that holds of the semaphore are really short
-	so it's ok to treat them like a spin lock (with protection from
-	real hangs of 1/2 second).
-	*/
-
-	timeout_ms = 10;	// 1/100 second
-	while(timeout_ms && (gate_val != SEMA4_GATEn_READ(gate_num)))
-	{
-		udelay(1000);	// 1 milli-second
-		SEMA4_GATEn_WRITE(gate_val, gate_num);
-		timeout_ms--;
-	}
-
-	return timeout_ms > 0 ? MCC_SUCCESS : -EBUSY;
+	return mvf_sema4_lock(sema4, TIME_PROTECT_US, true);
 }
 
-int mcc_sema4_release(unsigned char gate_num)
+int mcc_sema4_release()
 {
+	int ret, i;
 
-	if((gate_num < 0) || (gate_num >= MAX_SEMA4_GATES))
+	if(!sema4)
 		return -EINVAL;
 
-	SEMA4_GATEn_WRITE(0, gate_num);
+	ret = mvf_sema4_unlock(sema4);
+
+	for(i = 0; i<MAX_MVF_CPU_TO_CPU_INTERRUPTS; i++)
+		enable_irq(MVF_INT_CPU_INT0 + i);
 
 	// now that M4 has been released, release linux
 	up(&linux_mutex);
 
-	if(SEMA4_GATEn_READ(gate_num) == 0)
-		return MCC_SUCCESS;
-	else
-		return -EIO;
+	return ret;
 }
+
+int mcc_sema4_isr_grab()
+{
+	// inited yet?
+	if(!sema4) {
+		int ret = mvf_sema4_assign(MVF_SHMEM_SEMAPHORE_NUMBER, &sema4);
+		if(ret)
+			return ret;
+	}
+
+	// spin to grab it
+	while(mvf_sema4_lock(sema4, 0, false)) {};
+
+	return 0;
+}
+
+int mcc_sema4_isr_release()
+{
+	if(!sema4)
+		return -EINVAL;
+
+	return mvf_sema4_unlock(sema4);
+}
+
 

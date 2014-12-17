@@ -178,7 +178,7 @@ MCC_RECEIVE_LIST * mcc_get_endpoint_list(MCC_ENDPOINT endpoint)
 
         /* must be valid */
         if(endpoint.port == MCC_RESERVED_PORT_NUMBER)
-                return MCC_ERR_ENDPOINT;
+                return null;
 
 	for(i = 0; i<MCC_ATTR_MAX_RECEIVE_ENDPOINTS; i++) {
 

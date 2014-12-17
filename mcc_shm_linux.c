@@ -37,29 +37,12 @@
 
 struct mcc_bookeeping_struct *bookeeping_data = null;
 
-void print_bookeeping_data(void)
-{
-#if 0
+static void print_signals(void) {
 	int i,j;
+
 	MCC_SIGNAL *signal;
 	char *sig_type;
-	char init_string[INIT_STRING_LEN + 1];
 
-	printk(KERN_DEBUG "bookeeping_data= 0x%08x, VIRT_TO_MQX(bookeeping_data)= 0x%08x\n", bookeeping_data, VIRT_TO_MQX(bookeeping_data));
-	if(!bookeeping_data)
-		return;
-
-	memcpy_fromio(init_string, bookeeping_data->init_string, INIT_STRING_LEN);
-	init_string[INIT_STRING_LEN] = 0;
-	printk(KERN_DEBUG ".init_string = %s\n", bookeeping_data->init_string);
-
-	for(i=0; i<MCC_ATTR_MAX_RECEIVE_ENDPOINTS; i++)
-	{
-		printk(KERN_DEBUG "bookeeping_data->r_lists[%d](addr=0x%08x) .head= 0x%08x, .tail= 0x%08x\n",
-			i, VIRT_TO_MQX(&bookeeping_data->r_lists[i]), bookeeping_data->r_lists[i].head, bookeeping_data->r_lists[i].tail);
-	}
-
-	printk(KERN_DEBUG "bookeeping_data->free_list .head= 0x%08x, .tail= 0x%08x\n", bookeeping_data->free_list.head, bookeeping_data->free_list.tail);
 	for(i=0; i<MCC_NUM_CORES; i++)
 	{
 		printk(KERN_DEBUG "bookeeping_data->signal_queue_head[%d]= 0x%08x, ->signal_queue_tail[%d]= 0x%08x\n",
@@ -73,6 +56,28 @@ void print_bookeeping_data(void)
 				i, j, sig_type, signal->destination.core, signal->destination.node, signal->destination.port);
 		}
 	}
+}
+
+void print_bookeeping_data(void)
+{
+
+	printk(KERN_DEBUG "bookeeping_data= 0x%08x, VIRT_TO_MQX(bookeeping_data)= 0x%08x\n", bookeeping_data, VIRT_TO_MQX(bookeeping_data));
+	if(!bookeeping_data)
+		return;
+
+	printk(KERN_DEBUG ".init_string = %s\n", bookeeping_data->init_string);
+#if 0
+
+	for(i=0; i<MCC_ATTR_MAX_RECEIVE_ENDPOINTS; i++)
+	{
+		printk(KERN_DEBUG "bookeeping_data->r_lists[%d](addr=0x%08x) .head= 0x%08x, .tail= 0x%08x\n",
+			i, VIRT_TO_MQX(&bookeeping_data->r_lists[i]), bookeeping_data->r_lists[i].head, bookeeping_data->r_lists[i].tail);
+	}
+
+	printk(KERN_DEBUG "bookeeping_data->free_list .head= 0x%08x, .tail= 0x%08x\n", bookeeping_data->free_list.head, bookeeping_data->free_list.tail);
+#endif
+	print_signals();
+#if 0
 
 	for(i=0; i<MCC_ATTR_MAX_RECEIVE_ENDPOINTS; i++)
 	{
@@ -119,13 +124,13 @@ int mcc_map_shared_memory(void)
 
 int mcc_initialize_shared_mem(void)
 {
-	int i;
+	int i,j;
 	int return_value = MCC_SUCCESS;
 	char init_string[INIT_STRING_LEN];
 	unsigned char *bkdata;
 
 	// critical region for shared memory begins
-	if(mcc_sema4_grab(MCC_SHMEM_SEMAPHORE_NUMBER))
+	if(mcc_sema4_grab())
 	{
 		mcc_deinitialize_shared_mem();
 		return -EBUSY;
@@ -167,8 +172,19 @@ int mcc_initialize_shared_mem(void)
 	else
 		printk(KERN_DEBUG "at entry, bookeeping_data was initialized\n");
 
+	for(i=0; i<MCC_NUM_CORES; i++)
+	{
+		for(j=0; j<MCC_MAX_OUTSTANDING_SIGNALS; j++)
+		{
+			bookeeping_data->signals_received[i][j].type = 11;
+			bookeeping_data->signals_received[i][j].destination.core = 22;
+			bookeeping_data->signals_received[i][j].destination.node = 33;
+			bookeeping_data->signals_received[i][j].destination.port = 44;
+		}
+	}
+
 	// critical region for shared memory ends
-	mcc_sema4_release(MCC_SHMEM_SEMAPHORE_NUMBER);
+	mcc_sema4_release();
 
 	return return_value;
 }

@@ -19,7 +19,7 @@
 #define __MCC_COMMON__
 
 #define MCC_INIT_STRING    "mccisrd"
-#define MCC_VERSION_STRING "001.000"
+#define MCC_VERSION_STRING "001.002"
 
 typedef unsigned int MCC_BOOLEAN;
 typedef unsigned int MCC_MEM_SIZE;

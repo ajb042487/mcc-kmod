@@ -18,6 +18,8 @@
 #ifndef __MCC_CONFIG__
 #define __MCC_CONFIG__
 
+#include <linux/mvf_sema4.h>
+
 /* used OS */
 #define MCC_OS_USED                    (MCC_LINUX)
 
@@ -30,7 +32,7 @@
 
 /* maximum number of receive endpoints (application specific setting),
  * do not assign it to a value greater than 255 ! */
-#define MCC_ATTR_MAX_RECEIVE_ENDPOINTS (5)
+#define MCC_ATTR_MAX_RECEIVE_ENDPOINTS (10)
 
 
 /* size of the signal queue */
@@ -46,10 +48,6 @@
 #define MCC_OTHER_CORES			{1}
 
 /* semaphore number */
-#define MCC_SHMEM_SEMAPHORE_NUMBER      (1)
-#define MCC_PRINTF_SEMAPHORE_NUMBER     (2)
-#define MCC_I2C_SEMAPHORE_NUMBER        (3)
-#define MCC_RESERVED1_SEMAPHORE_NUMBER  (4)
-#define MCC_RESERVED2_SEMAPHORE_NUMBER  (5)
+#define MCC_SHMEM_SEMAPHORE_NUMBER      (MVF_SHMEM_SEMAPHORE_NUMBER)
 
 #endif /* __MCC_CONFIG__ */
