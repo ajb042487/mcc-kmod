@@ -129,8 +129,7 @@ int mcc_initialize_shared_mem(void)
 	unsigned char *bkdata;
 
 	// critical region for shared memory begins
-	if(mcc_sema4_grab())
-	{
+	if (mcc_sema4_grab()) {
 		mcc_deinitialize_shared_mem();
 		return -EBUSY;
 	}

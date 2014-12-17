@@ -18,6 +18,8 @@
 #ifndef __MCC_SEMA4_LINUX_H__
 #define __MCC_SEMA4_LINUX_H__
 
+int mcc_sema4_assign(void);
+int mcc_sema4_deassign(void);
 int mcc_sema4_grab(void);
 int mcc_sema4_release(void);
 int mcc_sema4_isr_grab(void);

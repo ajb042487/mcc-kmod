@@ -18,7 +18,7 @@
 #ifndef __MCC_CONFIG__
 #define __MCC_CONFIG__
 
-#include <linux/mvf_sema4.h>
+#include <linux/vf610_sema4.h>
 
 /* used OS */
 #define MCC_OS_USED                    (MCC_LINUX)

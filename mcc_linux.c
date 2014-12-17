@@ -44,12 +44,18 @@
 #include "mcc_linux.h"
 #include "mcc_shm_linux.h"
 #include "mcc_sema4_linux.h"
+#include <linux/vf610_mscm.h>
 
 // ************************************ Local Data *************************************************
 
 typedef enum write_mode_enum {MODE_IMAGE_LOAD, MODE_MCC} WRITE_MODE;
 
-#define MAX_LOAD_SIZE (256*1024)
+/*
+ * Region just above MQX default load address is used by MCC, hence we should
+ * not exceed to that region. But MQX load address has usually a offset of
+ * 0x400
+ */
+#define MAX_LOAD_SIZE (256*1024-0x400)
 
 struct mcc_private_data
 {
@@ -75,8 +81,6 @@ static dev_t first;
 static struct cdev c_dev;
 static struct class *cl;
 
-static __iomem void *mscm_base;
-
 DECLARE_WAIT_QUEUE_HEAD(free_buffer_queue);
 MCC_QUEUE_ENDPOINT_MAP endpoint_read_queues[MCC_ATTR_MAX_RECEIVE_ENDPOINTS];
 
@@ -98,7 +102,7 @@ static int signal_queued(MCC_ENDPOINT endpoint)
 		return -ENOMEM;
 
 	// send BUFFER_QUEUED to receiveing core
-	MSCM_WRITE(MCC_INTERRUPT(endpoint.core), MSCM_IRCPGIR);
+	mscm_trigger_cpu2cpu_irq(0, endpoint.core);
 
 	return MCC_SUCCESS;
 }
@@ -117,7 +121,7 @@ static int signal_freed(void)
 		mcc_queue_signal(signal.destination.core, signal);
 
 		// send BUFFER_QUEUED to receiveing core
-		MSCM_WRITE(MCC_INTERRUPT(signal.destination.core), MSCM_IRCPGIR);
+		mscm_trigger_cpu2cpu_irq(0, signal.destination.core);
 	}
 
 	return MCC_SUCCESS;
@@ -176,14 +180,8 @@ static irqreturn_t cpu_to_cpu_irq_handler(int irq, void *dev_id)
 	int ret;
 	int i = 0;
 
-	int interrupt_id = irq - MVF_INT_CPU_INT0;
-if(bad) {
-	//Clear the interrupt status
-	MSCM_WRITE((MSCM_IRCPnIR_INT0_MASK<<interrupt_id), MSCM_IRCPnIR);
-
-	return IRQ_HANDLED;
-}
-
+	if(bad)
+		return IRQ_HANDLED;
 
 if(nprint > 0) {
 	printk("==============\n");
@@ -230,9 +228,6 @@ if(nprint > 0) {
 		ret = mcc_dequeue_signal(MCC_CORE_NUMBER, &signal);
 		mcc_sema4_isr_release();
 	}
-
-	//Clear the interrupt status
-	MSCM_WRITE((MSCM_IRCPnIR_INT0_MASK<<interrupt_id), MSCM_IRCPnIR);
 
 	return IRQ_HANDLED;
 }
@@ -582,7 +577,7 @@ static long mcc_ioctl(struct file *f, unsigned cmd, unsigned long arg)
 		}
 		else
 		{
-			printk(KERN_ERR "unable to reserve imaqge load memory region\n");
+			printk(KERN_ERR "unable to reserve image load memory region\n");
 			return -ENOMEM;
 		}
 
@@ -706,84 +701,98 @@ static struct file_operations mcc_fops =
  
 static int __init mcc_init(void) /* Constructor */
 {
-	int count, k;
-	mscm_base = ioremap(MVF_MSCM_BASE_ADDR, 4);
+	int count, k, ret;
+
 	if (alloc_chrdev_region(&first, 0, 1, "mcc") < 0)
-	{
 		return -EIO;
+
+	if ((cl = class_create(THIS_MODULE, "mcc")) == NULL) {
+		ret = -EIO;
+		goto out_unreg_chrdev;
 	}
 
-	if ((cl = class_create(THIS_MODULE, "mcc")) == NULL)
-	{
-		unregister_chrdev_region(first, 1);
-		return -EIO;
-	}
-
-	if (device_create(cl, NULL, first, NULL, "mcc") == NULL)
-	{
-		class_destroy(cl);
-		unregister_chrdev_region(first, 1);
-		return -EIO;
+	if (device_create(cl, NULL, first, NULL, "mcc") == NULL) {
+		ret = -EIO;
+		goto out_class_destroy;
 	}
 
 	cdev_init(&c_dev, &mcc_fops);
-	if (cdev_add(&c_dev, first, 1) == -1)
-	{
-		device_destroy(cl, first);
-		class_destroy(cl);
-		unregister_chrdev_region(first, 1);
-		return -EIO;
+	if (cdev_add(&c_dev, first, 1) == -1) {
+		ret = -EIO;
+		goto out_device_destroy;
 	}
 
-	if(mcc_map_shared_memory())
-	{
-		cdev_del(&c_dev);
-		device_destroy(cl, first);
-		class_destroy(cl);
-		unregister_chrdev_region(first, 1);
-		return -EIO;
+	if (mcc_map_shared_memory()) {
+		ret = -ENOMEM;
+		goto out_cdev_del;
+	}
+
+	ret = mcc_sema4_assign();
+	if (ret) {
+		printk(KERN_ERR "SEMA4 assign failed: %d\n", ret);
+		goto out_free_shared_mem;
 	}
 
 	// Initialize shared memory
-	if(mcc_initialize_shared_mem())
-		return -EIO;
+	ret = mcc_initialize_shared_mem();
+	if (ret)
+		goto out_free_shared_mem;
 
-	//Register the interrupt handler
-	for(count=0; count < MAX_MVF_CPU_TO_CPU_INTERRUPTS; count++)
+	// Register the interrupt handler
+	for (count = 0; count < MAX_MVF_CPU_TO_CPU_INTERRUPTS; count++)
 	{
-		if (request_irq(MVF_INT_CPU_INT0 + count, cpu_to_cpu_irq_handler, 0, MCC_DRIVER_NAME, mscm_base) != 0)
-		{
-			printk(KERN_ERR "Failed to register MVF CPU TO CPU interrupt:%d\n",count);
-
-			// free the shared mem
-			mcc_deinitialize_shared_mem();
-
-			return -EIO;
+		ret = mscm_request_cpu2cpu_irq(count, cpu_to_cpu_irq_handler,
+					       MCC_DRIVER_NAME, NULL);
+		if (ret < 0) {
+			printk(KERN_ERR "Failed to register CPU2CPU interrupt %d: %d\n",
+					count, ret);
+			goto out_free_shared_mem;
 		}
 	}
 
-	//Initialize Wait Queue List -If called in mcc_open, everytime userspace opens a dev it will clear the queuelist
-	for(k = 0; k < MCC_ATTR_MAX_RECEIVE_ENDPOINTS; k++)
+	//
+	// Initialize Wait Queue List
+	// -If called in mcc_open, everytime userspace opens a dev it will clear the queuelist
+	for (k = 0; k < MCC_ATTR_MAX_RECEIVE_ENDPOINTS; k++)
 		endpoint_read_queues[k].queue_p = MCC_RESERVED_QUEUE_NUMBER;
 
-print_bookeeping_data();
-	printk(KERN_INFO "mcc registered major=%d, sizeof(struct mcc_bookeeping_struct)=%d\n",MAJOR(first), sizeof(struct mcc_bookeeping_struct));
+	print_bookeeping_data();
+	printk(KERN_INFO "mcc registered major=%d, bookeeping size=%d\n",
+			MAJOR(first), sizeof(struct mcc_bookeeping_struct));
+
 	return MCC_SUCCESS;
+
+out_free_shared_mem:
+	mcc_deinitialize_shared_mem();
+out_cdev_del:
+	cdev_del(&c_dev);
+out_device_destroy:
+	device_destroy(cl, first);
+out_class_destroy:
+	class_destroy(cl);
+out_unreg_chrdev:
+	unregister_chrdev_region(first, 1);
+
+	return ret;
 }
  
 static void __exit mcc_exit(void) /* Destructor */
 {
 	int count;
+
 	// make sure to let go of interrupts and shmem
-	for(count=0; count < MAX_MVF_CPU_TO_CPU_INTERRUPTS; count++)
-		free_irq(MVF_INT_CPU_INT0 + count, mscm_base);
+	for (count = 0; count < MAX_MVF_CPU_TO_CPU_INTERRUPTS; count++)
+		mscm_free_cpu2cpu_irq(count, NULL);
+
 	mcc_deinitialize_shared_mem();
 
-	iounmap(mscm_base);
+	mcc_sema4_deassign();
+
 	cdev_del(&c_dev);
 	device_destroy(cl, first);
 	class_destroy(cl);
 	unregister_chrdev_region(first, 1);
+
 
 	printk(KERN_INFO "mcc unregistered\n");
 }

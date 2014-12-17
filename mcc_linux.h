@@ -61,13 +61,7 @@ typedef unsigned int MCC_READ_MODE;
 
 // for interrupts
 #define MAX_MVF_CPU_TO_CPU_INTERRUPTS (4)
-#define MSCM_IRCPnIR_INT0_MASK		(0x00000001)
-#define MSCM_IRCPnIR	((CPU_LOGICAL_NUMBER == 0x0) ? 0x800 : 0x804)
 #define CPU_LOGICAL_NUMBER			(MCC_CORE_NUMBER)
-#define MSCM_IRCPGIR_CPUTL_SHIFT	(16)
-#define MSCM_WRITE(data, offset)	writel(data, mscm_base + offset)
-#define MSCM_IRCPGIR	0x820
-#define MCC_INTERRUPT(n) ((n == 0 ? 1 : 2) << MSCM_IRCPGIR_CPUTL_SHIFT)
 
 // for semaphores
 #define MAX_SEMA4_GATES 16

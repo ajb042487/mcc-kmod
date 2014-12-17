@@ -21,7 +21,7 @@
 #include <linux/delay.h>
 #include <linux/kernel.h>
 #include <linux/semaphore.h>
-#include <linux/mvf_sema4.h>
+#include <linux/vf610_sema4.h>
 #include <linux/interrupt.h>
 
 // common to MQX and Linux
@@ -56,16 +56,23 @@ DEFINE_SEMAPHORE(linux_mutex);
 // platform semaphore handle
 static MVF_SEMA4* sema4 = NULL;
 
+int mcc_sema4_assign()
+{
+	return mvf_sema4_assign(MVF_SHMEM_SEMAPHORE_NUMBER, &sema4);
+}
+
+int mcc_sema4_deassign()
+{
+	return mvf_sema4_deassign(sema4);
+}
+
 int mcc_sema4_grab()
 {
 	int i;
 
 	// inited yet?
-	if(!sema4) {
-		int ret = mvf_sema4_assign(MVF_SHMEM_SEMAPHORE_NUMBER, &sema4);
-		if(ret)
-			return ret;
-	}
+	if(!sema4)
+		return -EINVAL;
 
 	// only 1 linux process at a time
 	if(down_killable(&linux_mutex) == EINTR)
