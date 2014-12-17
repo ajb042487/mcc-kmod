@@ -1,0 +1,20 @@
+.mcc.ko.cmd
+.mcc.mod.o.cmd
+.mcc.o.cmd
+.mcc_common.o.cmd
+.mcc_linux.o.cmd
+.mcc_sema4_linux.o.cmd
+.mcc_shm_linux.o.cmd
+.tmp_versions/
+Module.symvers
+mcc.ko
+mcc.mod.c
+mcc.mod.o
+mcc.o
+mcc_common.o
+mcc_linux.o
+mcc_sema4_linux.o
+mcc_shm_linux.o
+modules.order
+#gedit backup files
+*~
