@@ -21,6 +21,11 @@
 #define MCC_INIT_STRING    "mccisrd"
 #define MCC_VERSION_STRING "001.002"
 
+#define MVF_IRAM_BASE_ADDR	0x3F000000
+#define MVF_AIPS0_BASE_ADDR	0x40000000
+#define MVF_MSCM_BASE_ADDR	(MVF_AIPS0_BASE_ADDR + 0x00001000)
+#define MVF_INT_CPU_INT0	32
+
 typedef unsigned int MCC_BOOLEAN;
 typedef unsigned int MCC_MEM_SIZE;
 #define null ((void*)0)

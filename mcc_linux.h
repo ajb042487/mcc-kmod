@@ -71,7 +71,7 @@ typedef unsigned int MCC_READ_MODE;
 
 // for semaphores
 #define MAX_SEMA4_GATES 16
-#define SEMA4_GATEn_READ(gate)		readb(MVF_IO_ADDRESS(MVF_SEMA4_BASE_ADDR) + gate)
-#define SEMA4_GATEn_WRITE(lock, gate) 	writeb(lock, MVF_IO_ADDRESS(MVF_SEMA4_BASE_ADDR) + gate)
+#define SEMA4_GATEn_READ(gate)		readb(sema4_base_addr + gate)
+#define SEMA4_GATEn_WRITE(lock, gate) 	writeb(lock, sema4_base_addr + gate)
 
 #endif /* __MCC_LINUX_H__ */

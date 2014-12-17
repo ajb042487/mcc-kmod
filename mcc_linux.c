@@ -26,7 +26,6 @@
 #include <linux/wait.h>
 
 #include <linux/slab.h>
-#include <mach/hardware.h>
 #include <linux/string.h>
 #include <linux/io.h>
 #include <linux/uaccess.h>
@@ -76,7 +75,7 @@ static dev_t first;
 static struct cdev c_dev;
 static struct class *cl;
 
-static __iomem void *mscm_base = MVF_IO_ADDRESS(MVF_MSCM_BASE_ADDR);
+static __iomem void *mscm_base;
 
 DECLARE_WAIT_QUEUE_HEAD(free_buffer_queue);
 MCC_QUEUE_ENDPOINT_MAP endpoint_read_queues[MCC_ATTR_MAX_RECEIVE_ENDPOINTS];
@@ -487,8 +486,7 @@ static long mcc_ioctl(struct file *f, unsigned cmd, unsigned long arg)
 	MCC_RECEIVE_BUFFER * r_buf;
 	int count;
 	MCC_NODE this_node;
-
-
+	void * src_gpr2, * ccm_ccowr;
 	int retval = 0;
 
 	switch(cmd)
@@ -592,10 +590,24 @@ static long mcc_ioctl(struct file *f, unsigned cmd, unsigned long arg)
 		return MCC_SUCCESS;
 
 	case  MCC_BOOT_MQX_IMAGE:
+		src_gpr2 = ioremap(0x4006E028, 4);
+		ccm_ccowr = ioremap(0x4006B08C, 4);
+
+		if( !src_gpr2 || !ccm_ccowr )
+		{
+			printk(KERN_ERR "unable to map src_gpr2 or ccm_ccowr to start m4 clock, aborting.\n");
+			return -ENOMEM;
+		}
+
 		//0x4006E028 - GPR2 Register write Image Entry Point as per the Memory Map File of the Binary
-		writel(priv_p->mqx_boot_info.phys_start_addr, MVF_IO_ADDRESS(0x4006E028));
+		writel(priv_p->mqx_boot_info.phys_start_addr, src_gpr2);
+
 		// 0x4006B08C - CCM_CCOWR Register - Set bit 16 - AUX_CORE_WKUP to enable M4 clock.
-		writel(0x15a5a, MVF_IO_ADDRESS(0x4006B08C));
+		writel(0x15a5a, ccm_ccowr);
+
+		iounmap(src_gpr2);
+		iounmap(ccm_ccowr);
+
 		return MCC_SUCCESS;
 
 	case MCC_SET_TIMEOUT:
@@ -695,7 +707,7 @@ static struct file_operations mcc_fops =
 static int __init mcc_init(void) /* Constructor */
 {
 	int count, k;
-
+	mscm_base = ioremap(MVF_MSCM_BASE_ADDR, 4);
 	if (alloc_chrdev_region(&first, 0, 1, "mcc") < 0)
 	{
 		return -EIO;
@@ -767,6 +779,7 @@ static void __exit mcc_exit(void) /* Destructor */
 		free_irq(MVF_INT_CPU_INT0 + count, mscm_base);
 	mcc_deinitialize_shared_mem();
 
+	iounmap(mscm_base);
 	cdev_del(&c_dev);
 	device_destroy(cl, first);
 	class_destroy(cl);

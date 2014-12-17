@@ -14,8 +14,7 @@ modules_install install: all
 	$(MAKE) -C $(KERNEL_SRC) M=$(PWD) modules_install INSTALL_MOD_PATH=$(DESTDIR)
 	@echo Copying mcc headers to toolchain
 	mkdir -p $(DESTDIR)/usr/include/linux
-	cp -f {mcc_linux.h,mcc_common.h,mcc_config.h} $(DESTDIR)/usr/include/linux/
-
+	cp -f mcc_linux.h mcc_common.h mcc_config.h $(DESTDIR)/usr/include/linux/
 
 clean:
 	$(MAKE) -C $(KERNEL_SRC) M=$(PWD) clean
