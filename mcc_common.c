@@ -72,6 +72,11 @@ int mcc_register_endpoint(MCC_ENDPOINT endpoint)
 int mcc_remove_endpoint(MCC_ENDPOINT endpoint)
 {
 	int i=0;
+
+        /* must be valid */
+        if(endpoint.port == MCC_RESERVED_PORT_NUMBER)
+                return MCC_ERR_ENDPOINT;
+
 	for(i = 0; i < MCC_ATTR_MAX_RECEIVE_ENDPOINTS; i++) {
 
 		if(MCC_ENDPOINTS_EQUAL(bookeeping_data->endpoint_table[i].endpoint, endpoint)) {
@@ -168,6 +173,11 @@ void mcc_queue_buffer(MCC_RECEIVE_LIST *list, MCC_RECEIVE_BUFFER * r_buffer)
 MCC_RECEIVE_LIST * mcc_get_endpoint_list(MCC_ENDPOINT endpoint)
 {
 	int i=0;
+
+        /* must be valid */
+        if(endpoint.port == MCC_RESERVED_PORT_NUMBER)
+                return MCC_ERR_ENDPOINT;
+
 	for(i = 0; i<MCC_ATTR_MAX_RECEIVE_ENDPOINTS; i++) {
 
 		if(MCC_ENDPOINTS_EQUAL(bookeeping_data->endpoint_table[i].endpoint, endpoint))

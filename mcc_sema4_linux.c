@@ -21,6 +21,7 @@
 #include <linux/io.h>
 #include <linux/delay.h>
 #include <linux/kernel.h>
+#include <linux/semaphore.h>
 
 // common to MQX and Linux
 // TODO the order of these should not matter
@@ -32,6 +33,9 @@
 #include "mcc_shm_linux.h"
 #include "mcc_sema4_linux.h"
 
+// local mutex
+DEFINE_SEMAPHORE(linux_mutex);
+
 int mcc_sema4_grab(unsigned char gate_num)
 {
 	unsigned char gate_val;
@@ -39,6 +43,10 @@ int mcc_sema4_grab(unsigned char gate_num)
 
 	if((gate_num < 0) || (gate_num >= MAX_SEMA4_GATES))
 		return -EINVAL;
+
+	// only 1 linux process at a time
+	if(down_killable(&linux_mutex) == EINTR)
+		return -EINTR;
 
 	gate_val = MCC_CORE_NUMBER + 1;
 	SEMA4_GATEn_WRITE(gate_val, gate_num);
@@ -67,6 +75,9 @@ int mcc_sema4_release(unsigned char gate_num)
 		return -EINVAL;
 
 	SEMA4_GATEn_WRITE(0, gate_num);
+
+	// now that M4 has been released, release linux
+	up(&linux_mutex);
 
 	if(SEMA4_GATEn_READ(gate_num) == 0)
 		return MCC_SUCCESS;

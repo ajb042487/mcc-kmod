@@ -192,8 +192,8 @@ static irqreturn_t cpu_to_cpu_irq_handler(int irq, void *dev_id)
 					//printk("received message for endpoint %d, %d, %d\n", endpoint_read_queues[i].endpoint.core,
 					//		endpoint_read_queues[i].endpoint.node, endpoint_read_queues[i].endpoint.port);
 					wake_up_interruptible(endpoint_read_queues[i].queue_p);
+					break;
 				}
-				break;
 			}
 		}
 	}
@@ -323,8 +323,8 @@ static ssize_t mcc_read(struct file *f, char __user *buf, size_t len, loff_t *of
 					else if(retval < 0)
 						return retval;
 				}
+				break;
 			}
-			break;
 		}
 	}
 
@@ -385,16 +385,6 @@ static ssize_t mcc_write(struct file *f, const char __user *buf, size_t len, lof
 	if(len > sizeof(buffer->data))
 		return -EINVAL;
 
-	// get the target endpoint
-	if(mcc_sema4_grab(MCC_SHMEM_SEMAPHORE_NUMBER))
-		return -EBUSY;
-	if(!(send_list = mcc_get_endpoint_list(priv_p->send_endpoint)))
-	{
-		mcc_sema4_release(MCC_SHMEM_SEMAPHORE_NUMBER);
-		return -EINVAL;
-	}
-	mcc_sema4_release(MCC_SHMEM_SEMAPHORE_NUMBER);
-
 	// block unless asked not to
 	if(!(f->f_flags & O_NONBLOCK))
 	{
@@ -431,6 +421,13 @@ static ssize_t mcc_write(struct file *f, const char __user *buf, size_t len, lof
 
 	if(mcc_sema4_grab(MCC_SHMEM_SEMAPHORE_NUMBER))
 		return -EBUSY;
+        // get the target endpoint
+        if(!(send_list = mcc_get_endpoint_list(priv_p->send_endpoint)))
+        {
+                mcc_sema4_release(MCC_SHMEM_SEMAPHORE_NUMBER);
+                return -EINVAL;
+        }
+
 	// queue it
 	mcc_queue_buffer(send_list, buffer);
 
@@ -478,14 +475,6 @@ static long mcc_ioctl(struct file *f, unsigned cmd, unsigned long arg)
 		return MCC_SUCCESS;
 
 	case MCC_CREATE_ENDPOINT:
-		if(mcc_sema4_grab(MCC_SHMEM_SEMAPHORE_NUMBER))
-			return -EBUSY;
-		{
-			retval = deregister_queue(endpoint);
-			if(retval == MCC_SUCCESS)
-				retval = mcc_remove_endpoint(endpoint);
-		}
-		mcc_sema4_release(MCC_SHMEM_SEMAPHORE_NUMBER);
 	case MCC_DESTROY_ENDPOINT:
 		if (copy_from_user(&endpoint, buf, sizeof(endpoint)))
 			return -EFAULT;
@@ -520,9 +509,15 @@ static long mcc_ioctl(struct file *f, unsigned cmd, unsigned long arg)
 		if (copy_from_user(&endpoint, buf, sizeof(endpoint)))
 			return -EFAULT;
 
+		if(mcc_sema4_grab(MCC_SHMEM_SEMAPHORE_NUMBER))
+			return -EBUSY;
+
 		// has it been registered ?
-		if(!mcc_get_endpoint_list(endpoint))
+		if(!mcc_get_endpoint_list(endpoint)) {
+			mcc_sema4_release(MCC_SHMEM_SEMAPHORE_NUMBER);
 			return -EINVAL;
+		}
+		mcc_sema4_release(MCC_SHMEM_SEMAPHORE_NUMBER);
 
 		endpoint_p = cmd == MCC_SET_SEND_ENDPOINT ? &priv_p->send_endpoint : &priv_p->recv_endpoint;
 
