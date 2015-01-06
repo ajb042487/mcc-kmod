@@ -18,7 +18,12 @@
 #ifndef __MCC_CONFIG__
 #define __MCC_CONFIG__
 
+#ifdef __KERNEL__
 #include <linux/vf610_sema4.h>
+
+/* semaphore number */
+#define MCC_SHMEM_SEMAPHORE_NUMBER      (MVF_SHMEM_SEMAPHORE_NUMBER)
+#endif
 
 /* used OS */
 #define MCC_OS_USED                    (MCC_LINUX)
@@ -46,8 +51,5 @@
 
 /* other cores, besides this participating in mcc */
 #define MCC_OTHER_CORES			{1}
-
-/* semaphore number */
-#define MCC_SHMEM_SEMAPHORE_NUMBER      (MVF_SHMEM_SEMAPHORE_NUMBER)
 
 #endif /* __MCC_CONFIG__ */
