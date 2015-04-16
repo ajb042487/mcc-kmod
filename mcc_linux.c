@@ -257,7 +257,10 @@ static int mcc_close(struct inode *inode, struct file *f)
 	if(priv_p->write_mode == MODE_IMAGE_LOAD)
 	{
 		iounmap(priv_p->virt_load_addr);
-		release_mem_region(priv_p->mqx_boot_info.phys_load_addr, MAX_LOAD_SIZE);
+
+		if (!(priv_p->mqx_boot_info.phys_load_addr >= MVF_IRAM_BASE_ADDR &&
+		      priv_p->mqx_boot_info.phys_load_addr < MVF_AIPS0_BASE_ADDR))
+			release_mem_region(priv_p->mqx_boot_info.phys_load_addr, MAX_LOAD_SIZE);
 	}
 
 	// else cleamn up all the endpoints
@@ -564,19 +567,23 @@ static long mcc_ioctl(struct file *f, unsigned cmd, unsigned long arg)
 		if (copy_from_user(&priv_p->mqx_boot_info, buf, sizeof(priv_p->mqx_boot_info)))
 			return -EFAULT;
 
-		if (request_mem_region(priv_p->mqx_boot_info.phys_load_addr, MAX_LOAD_SIZE, "mqx_boot"))
-		{
-			priv_p->virt_load_addr = ioremap_nocache(priv_p->mqx_boot_info.phys_load_addr, MAX_LOAD_SIZE);
-			if (!priv_p->virt_load_addr)
-			{
-				printk(KERN_ERR "unable to map region\n");
-				release_mem_region(priv_p->mqx_boot_info.phys_load_addr, MAX_LOAD_SIZE);
-				return -ENOMEM;
-			}
-		}
-		else
-		{
+		/*
+		 * SRAM is managed by genalloc since it is also used for suspend/resume
+		 * Do not use request_mem_region, since this fails. Allocating
+		 * most likely also fails since suspend/resume make use of it.
+		 */
+		if (priv_p->mqx_boot_info.phys_load_addr >= MVF_IRAM_BASE_ADDR &&
+		    priv_p->mqx_boot_info.phys_load_addr < MVF_AIPS0_BASE_ADDR)
+			printk(KERN_WARNING "Loading into SRAM area, which might be used by suspend/resume!\n");
+		else if (!request_mem_region(priv_p->mqx_boot_info.phys_load_addr, MAX_LOAD_SIZE, "mqx_boot")) {
 			printk(KERN_ERR "unable to reserve image load memory region\n");
+			return -ENOMEM;
+		}
+
+		priv_p->virt_load_addr = ioremap_nocache(priv_p->mqx_boot_info.phys_load_addr, MAX_LOAD_SIZE);
+		if (!priv_p->virt_load_addr) {
+			printk(KERN_ERR "unable to map region\n");
+			release_mem_region(priv_p->mqx_boot_info.phys_load_addr, MAX_LOAD_SIZE);
 			return -ENOMEM;
 		}
 

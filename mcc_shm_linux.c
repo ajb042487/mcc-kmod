@@ -17,9 +17,12 @@
 */
 #include <linux/types.h>
 #include <linux/device.h>
+#include <linux/genalloc.h>
 #include <linux/io.h>
 #include <linux/kernel.h>
 #include <linux/slab.h>
+#include <linux/of.h>
+#include <linux/of_platform.h>
 
 // common to MQX and Linux
 // TODO the order of these should not matter
@@ -34,6 +37,7 @@
 #define INIT_STRING_LEN (sizeof(bookeeping_data->init_string))
 #define VERSION_STRING_LEN (sizeof(bookeeping_data->version_string))
 
+struct gen_pool *shm_gen_pool;
 struct mcc_bookeeping_struct *bookeeping_data = null;
 
 static void print_signals(void) {
@@ -97,27 +101,64 @@ void print_bookeeping_data(void)
 #endif
 }
 
+struct gen_pool *mcc_get_smem_pool(unsigned long base_address)
+{
+	struct device_node *node;
+	struct platform_device *pdev;
+	struct gen_pool *ocram_pool;
+	char *path = "/soc/sram@00000000";
+
+	sprintf(path + 10, "%08x", base_address);
+	node = of_find_node_by_path(path);
+	if (!node) {
+		pr_warn("%s: failed to find ocram node at %s!\n", __func__, path);
+		return ERR_PTR(-ENODEV);
+	}
+
+	pdev = of_find_device_by_node(node);
+	of_node_put(node);
+	if (!pdev) {
+		pr_warn("%s: failed to find ocram device!\n", __func__);
+		return ERR_PTR(-ENODEV);
+	}
+
+	ocram_pool = dev_get_gen_pool(&pdev->dev);
+	if (!ocram_pool) {
+		pr_warn("%s: ocram pool unavailable!\n", __func__);
+		return ERR_PTR(-ENODEV);
+	}
+
+	return ocram_pool;
+}
+
 int mcc_map_shared_memory(void)
 {
-	// map the real shared memory
-	if(!bookeeping_data)
-	{
-		if (request_mem_region(SHARED_IRAM_START, SHARED_IRAM_SIZE, "mcc_shmem"))
-		{
-			bookeeping_data = ioremap_nocache(SHARED_IRAM_START, SHARED_IRAM_SIZE);
-			if (!bookeeping_data)
-			{
-				printk(KERN_ERR "unable to map region\n");
-				release_mem_region(SHARED_IRAM_START, SHARED_IRAM_SIZE);
-				return -ENOMEM;
-			}
-		}
-		else
-		{
-			printk(KERN_ERR "unable to reserve real shared memory region\n");
-			return -ENOMEM;
-		}
+	unsigned long alloc_virt_addr;
+	unsigned long alloc_phys_addr;
+
+	shm_gen_pool = mcc_get_smem_pool(SHARED_IRAM_START);
+	if (IS_ERR(shm_gen_pool)) {
+		shm_gen_pool = NULL;
+		return PTR_ERR(shm_gen_pool);
 	}
+
+	alloc_virt_addr = gen_pool_alloc(shm_gen_pool, SHARED_IRAM_SIZE);
+	if (!alloc_virt_addr) {
+		pr_warn("%s: unable to alloc ocram!\n", __func__);
+		return -ENOMEM;
+	}
+
+	/* Verify we got the address space we expect */
+	alloc_phys_addr = gen_pool_virt_to_phys(shm_gen_pool, alloc_virt_addr);
+	if (alloc_phys_addr != SHARED_IRAM_START) {
+		pr_warn("%s: alloc ocram is not located at expected address!\n",
+			__func__);
+		gen_pool_free(shm_gen_pool, alloc_virt_addr, SHARED_IRAM_SIZE);
+		return -ENOMEM;
+	}
+
+	bookeeping_data = (struct mcc_bookeeping_struct *)alloc_virt_addr;
+
 	return MCC_SUCCESS;
 }
 
@@ -189,12 +230,8 @@ int mcc_initialize_shared_mem(void)
 
 void mcc_deinitialize_shared_mem(void)
 {
-	if(bookeeping_data)
-	{
-		iounmap(bookeeping_data);
-		release_mem_region(SHARED_IRAM_START, SHARED_IRAM_SIZE);
-		bookeeping_data = null;
-	}
+	gen_pool_free(shm_gen_pool, (unsigned long)bookeeping_data, SHARED_IRAM_SIZE);
+	bookeeping_data = NULL;
 }
 
 

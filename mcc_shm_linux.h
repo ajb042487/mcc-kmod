@@ -23,6 +23,7 @@ extern struct mcc_bookeeping_struct *bookeeping_data;
 #define VIRT_TO_MQX(a) ((a == 0) ? 0 : ((unsigned)(a) - (unsigned)bookeeping_data) + (unsigned)SHARED_IRAM_START)
 #define MQX_TO_VIRT(a) ((a == 0) ? 0 : ((unsigned)(a) - SHARED_IRAM_START) + (unsigned)bookeeping_data)
 
+struct gen_pool *mcc_get_smem_pool(unsigned long base_address);
 int mcc_initialize_shared_mem(void);
 void mcc_deinitialize_shared_mem(void);
 void print_bookeeping_data(void);
