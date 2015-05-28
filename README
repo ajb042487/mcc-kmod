@@ -1,0 +1,22 @@
+This is an out-of-tree kernel module which implements Freescale's
+Multi-Core Communication for Vybrid SoC's.
+
+This repository contains changes which allow the kernel module to
+work with newer kernels which use IRQ domains and virtual IRQ
+numbers. However, some custom kernel symbols are required to access
+the CPU2CPU interrupts of Vybrid's MSCM module:
+- mscm_request_cpu2cpu_irq
+- mscm_free_cpu2cpu_irq
+- mscm_trigger_cpu2cpu_irq
+- mscm_enable_cpu2cpu_irq
+- mscm_disable_cpu2cpu_irq
+
+The kernel provided by Toradex implements those symbols. See also
+Toradex official git repository:
+http://git.toradex.com/
+
+To build the kernel module the source code of the kernel which the
+module will be loaded into is required. Use the argument -C to
+specify the location of the sources:
+$ make -C ../path/to/kernel-source/ M=$PWD
+
