@@ -22,6 +22,7 @@
 #include <linux/kernel.h>
 #include <linux/semaphore.h>
 #include <linux/vf610_sema4.h>
+#include <linux/vf610_mscm.h>
 #include <linux/interrupt.h>
 
 // common to MQX and Linux
@@ -80,7 +81,7 @@ int mcc_sema4_grab()
 
 	// no M4 interrupts while we're working
 	for(i = 0; i<MAX_MVF_CPU_TO_CPU_INTERRUPTS; i++)
-		disable_irq(MVF_INT_CPU_INT0 + i);
+		mscm_disable_cpu2cpu_irq(i);
 
 	return mvf_sema4_lock(sema4, TIME_PROTECT_US, true);
 }
@@ -95,7 +96,7 @@ int mcc_sema4_release()
 	ret = mvf_sema4_unlock(sema4);
 
 	for(i = 0; i<MAX_MVF_CPU_TO_CPU_INTERRUPTS; i++)
-		enable_irq(MVF_INT_CPU_INT0 + i);
+		mscm_enable_cpu2cpu_irq(i);
 
 	// now that M4 has been released, release linux
 	up(&linux_mutex);
