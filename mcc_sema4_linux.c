@@ -24,6 +24,7 @@
 #include <linux/vf610_sema4.h>
 #include <linux/vf610_mscm.h>
 #include <linux/interrupt.h>
+#include <linux/version.h>
 
 // common to MQX and Linux
 // TODO the order of these should not matter
@@ -45,7 +46,7 @@
  * because of caching limitations on the M4 core
  * the calling routines do not provide a gate number.
  *
- * No explicit init call is used. It is checked / done 
+ * No explicit init call is used. It is checked / done
  * at grab time.
 */
 
@@ -55,19 +56,32 @@
 DEFINE_SEMAPHORE(linux_mutex);
 
 // platform semaphore handle
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0)
+static struct vf610_sema4_mutex* sema4 = NULL;
+#else
 static MVF_SEMA4* sema4 = NULL;
+#endif
 
-int mcc_sema4_assign()
+int mcc_sema4_assign(void)
 {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0)
+	sema4 = vf610_sema4_mutex_create(0, 0);
+	return 0;
+#else
 	return mvf_sema4_assign(MVF_SHMEM_SEMAPHORE_NUMBER, &sema4);
+#endif
 }
 
-int mcc_sema4_deassign()
+int mcc_sema4_deassign(void)
 {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0)
+	return vf610_sema4_mutex_destroy(sema4);
+#else
 	return mvf_sema4_deassign(sema4);
+#endif
 }
 
-int mcc_sema4_grab()
+int mcc_sema4_grab(void)
 {
 	int i;
 
@@ -83,18 +97,25 @@ int mcc_sema4_grab()
 	for(i = 0; i<MAX_MVF_CPU_TO_CPU_INTERRUPTS; i++)
 		mscm_disable_cpu2cpu_irq(i);
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0)
+	return vf610_sema4_mutex_lock(sema4);
+#else
 	return mvf_sema4_lock(sema4, TIME_PROTECT_US, true);
+#endif
 }
 
-int mcc_sema4_release()
+int mcc_sema4_release(void)
 {
 	int ret, i;
 
 	if(!sema4)
 		return -EINVAL;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0)
+	ret = vf610_sema4_mutex_unlock(sema4);
+#else
 	ret = mvf_sema4_unlock(sema4);
-
+#endif
 	for(i = 0; i<MAX_MVF_CPU_TO_CPU_INTERRUPTS; i++)
 		mscm_enable_cpu2cpu_irq(i);
 
@@ -104,27 +125,39 @@ int mcc_sema4_release()
 	return ret;
 }
 
-int mcc_sema4_isr_grab()
+int mcc_sema4_isr_grab(void)
 {
 	// inited yet?
 	if(!sema4) {
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0)
+		sema4 = vf610_sema4_mutex_create(0, 0);
+		if(!sema4)
+			return -EINVAL;
+#else
 		int ret = mvf_sema4_assign(MVF_SHMEM_SEMAPHORE_NUMBER, &sema4);
 		if(ret)
 			return ret;
+
+#endif
 	}
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0)
+	while(vf610_sema4_mutex_lock(sema4)) {};
+#else
 	// spin to grab it
 	while(mvf_sema4_lock(sema4, 0, false)) {};
-
+#endif
 	return 0;
 }
 
-int mcc_sema4_isr_release()
+int mcc_sema4_isr_release(void)
 {
 	if(!sema4)
 		return -EINVAL;
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4, 4, 0)
+	return vf610_sema4_mutex_unlock(sema4);
+#else
 	return mvf_sema4_unlock(sema4);
+#endif
 }
-
-

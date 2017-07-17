@@ -23,6 +23,7 @@
 #include <linux/slab.h>
 #include <linux/of.h>
 #include <linux/of_platform.h>
+#include <linux/version.h>
 
 // common to MQX and Linux
 // TODO the order of these should not matter
@@ -122,7 +123,11 @@ struct gen_pool *mcc_get_smem_pool(unsigned long base_address)
 		return ERR_PTR(-ENODEV);
 	}
 
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,4,73)
+	ocram_pool = gen_pool_get(&pdev->dev, NULL);
+#else
 	ocram_pool = dev_get_gen_pool(&pdev->dev);
+#endif
 	if (!ocram_pool) {
 		pr_warn("%s: ocram pool unavailable!\n", __func__);
 		return ERR_PTR(-ENODEV);
@@ -233,5 +238,3 @@ void mcc_deinitialize_shared_mem(void)
 	gen_pool_free(shm_gen_pool, (unsigned long)bookeeping_data, SHARED_IRAM_SIZE);
 	bookeeping_data = NULL;
 }
-
-
