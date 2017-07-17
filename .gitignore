@@ -18,3 +18,5 @@ mcc_shm_linux.o
 modules.order
 #gedit backup files
 *~
+.built-in.o.cmd
+built-in.o
