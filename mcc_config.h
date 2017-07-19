@@ -19,6 +19,8 @@
 #define __MCC_CONFIG__
 
 #ifdef __KERNEL__
+#include <linux/types.h>
+#include <linux/wait.h>
 #include <linux/vf610_sema4.h>
 
 /* semaphore number */
